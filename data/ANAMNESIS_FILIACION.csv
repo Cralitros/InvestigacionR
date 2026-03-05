@@ -1,4 +1,4 @@
-Item;Numero de historia clinica;Nombres y apellidos del paciente;Tipo seguro;Nro Seguro;Lugar de nacimiento;Fecha nacimiento;edad;sexo;domicilio actual;Luqar de Procedencia;Documento de identificacion;Estado Civil;Grado de instruccion;Ocupacion;Religion;Telefono;Acompañante;Domicilio y/o tetefono de la persona responsable;Fecha de Ingreso;Fecha de elaboracion de historia cllnica
+ITEM;Numero de historia clinica;Nombres y apellidos del paciente;Tipo seguro;Nro Seguro;Lugar de nacimiento;Fecha nacimiento;edad;sexo;domicilio actual;Luqar de Procedencia;Documento de identificacion;Estado Civil;Grado de instruccion;Ocupacion;Religion;Telefono;Acompañante;Domicilio y/o tetefono de la persona responsable;Fecha de Ingreso;Fecha de elaboracion de historia clinica
 1;1;1;1;3;1;1;1;1;1;3;1;3;3;3;3;3;3;3;1;2
 2;1;1;1;3;1;1;1;1;3;3;1;3;3;3;3;3;3;3;2;1
 3;1;1;1;3;1;1;1;1;1;1;1;1;1;1;3;1;1;1;1;1
