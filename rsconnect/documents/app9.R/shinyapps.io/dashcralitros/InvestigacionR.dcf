@@ -1,0 +1,13 @@
+name: InvestigacionR
+title: InvestigacionR
+username: dashcralitros
+account: dashcralitros
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16823675
+bundleId: 11667066
+url: https://dashcralitros.shinyapps.io/InvestigacionR/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: app.R|app2.R|app3.R|app4.R|app5.R|app6.R|app7.R|app8.R
