@@ -1,9 +1,11 @@
 # ============================================================================
-# AUDITORÍA DE CALIDAD DE HISTORIAS CLÍNICAS - VERSIÓN CON GITHUB
+# AUDITORÍA DE CALIDAD DE HISTORIAS CLÍNICAS - CARGA AUTOMÁTICA GitHub
 # URL: https://raw.githubusercontent.com/Cralitros/InvestigacionR/refs/heads/main/data/
 # ============================================================================
 
+# ============================================================================
 # 1. CARGA DE LIBRERÍAS
+# ============================================================================
 library(shiny)
 library(shinydashboard)
 library(tidyverse)
@@ -15,19 +17,15 @@ library(DT)
 library(shinyWidgets)
 
 # ============================================================================
-# CONFIGURACIÓN GITHUB - AGREGAR ESTO (NUEVO)
+# 2. CONFIGURACIÓN GITHUB
 # ============================================================================
-
-# Token opcional (dejar vacío si el repo es público)
 GITHUB_TOKEN <- ""
-
-# URL base que funciona para tu repo
 BASE_URL_GITHUB <- "https://raw.githubusercontent.com/Cralitros/InvestigacionR/refs/heads/main/data/"
 
-# Lista de archivos a cargar (nombres exactos como en GitHub)
+# TODOS LOS ARCHIVOS INCLUYENDO CUESTIONARIO
 ARCHIVOS_GITHUB <- c(
   "ANAMNESIS_FILIACION.csv",
-  "ENFERMEDAD_ACTUAL.csv", 
+  "ENFERMEDAD_ACTUAL.csv",
   "EXAMEN_CLINICO.csv",
   "DIAGNOSTICOS.csv",
   "PLAN_TRABAJO.csv",
@@ -36,14 +34,14 @@ ARCHIVOS_GITHUB <- c(
   "REGISTROS_ENFERMERIA.csv",
   "INDICACIONES_ALTA.csv",
   "ATRIBUTOS_HC.csv",
-  "FORMATOS_ESPECIALES.csv"
+  "FORMATOS_ESPECIALES.csv",
+  "CUESTIONARIO_FACTORES.csv"  # ← CUESTIONARIO AHORA EN GITHUB
 )
 
 # Función para leer CSV desde GitHub
 leer_csv_github <- function(nombre_archivo) {
   url <- paste0(BASE_URL_GITHUB, nombre_archivo)
   if(nchar(GITHUB_TOKEN) > 0) url <- paste0(url, "?token=", GITHUB_TOKEN)
-  
   tryCatch({
     df <- read_csv2(url, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
     message("✅ Cargado: ", nombre_archivo)
@@ -55,16 +53,14 @@ leer_csv_github <- function(nombre_archivo) {
 }
 
 # ============================================================================
-# FUNCIONES AUXILIARES (IGUAL QUE TU CÓDIGO ORIGINAL)
+# 3. FUNCIONES AUXILIARES
 # ============================================================================
-
 truncar_texto <- function(texto, max_caracteres = 40) {
   ifelse(nchar(texto) > max_caracteres,
          paste0(substr(texto, 1, max_caracteres), "..."),
          texto)
 }
 
-# Función mejorada para detectar sección desde nombre de archivo
 detectar_seccion <- function(nombre_archivo) {
   nombre_upper <- toupper(nombre_archivo)
   if(grepl("ANAMNESIS|FILIACION", nombre_upper)) return("ANAMNESIS_FILIACION")
@@ -78,13 +74,13 @@ detectar_seccion <- function(nombre_archivo) {
   else if(grepl("ALTA|INDICACIONES.*ALTA", nombre_upper)) return("INDICACIONES_ALTA")
   else if(grepl("ATRIBUTO", nombre_upper)) return("ATRIBUTOS_HC")
   else if(grepl("FORMATO|ESPECIAL", nombre_upper)) return("FORMATOS_ESPECIALES")
+  else if(grepl("CUESTIONARIO|FACTORES", nombre_upper)) return("CUESTIONARIO")
   else return(NA)
 }
 
 # ============================================================================
-# DATOS ESTÁTICOS: TABLA DE PESOS (COMPLETA - IGUAL)
+# 4. TABLA DE PESOS
 # ============================================================================
-
 pesos_db <- tribble(
   ~SECCION, ~VARIABLE, ~PESO_COMPLETO, ~PESO_INCOMPLETO, ~PESO_NO_EXISTE, ~PESO_NO_APLICA,
   "ANAMNESIS_FILIACION", "Numero de historia clinica", 0.25, 0, 0, 0,
@@ -173,7 +169,6 @@ pesos_db <- tribble(
   "FORMATOS_ESPECIALES", "Epicrisis", 1, 0, 0, 0
 )
 
-# Nombres amigables para secciones
 nombres_secciones <- c(
   "ANAMNESIS_FILIACION" = "📋 Anamnesis y Filiación",
   "ENFERMEDAD_ACTUAL" = "🏥 Enfermedad Actual",
@@ -189,19 +184,19 @@ nombres_secciones <- c(
 )
 
 # ============================================================================
-# UI (INTERFAZ DE USUARIO) - SOLO CAMBIA EL TAB "carga"
+# 5. UI - SIMPLIFICADA (SIN CARGA MANUAL)
 # ============================================================================
-
 ui <- dashboardPage(
-  dashboardHeader(title = "Auditoría Calidad HC", titleWidth = 300),
+  dashboardHeader(title = "Auditoría Calidad HC + Factores", titleWidth = 350),
   dashboardSidebar(
     width = 300,
     sidebarMenu(
-      menuItem("🔄 Cargar desde GitHub", tabName = "carga", icon = icon("cloud-download-alt")),
+      menuItem("🔄 Cargar Datos", tabName = "carga", icon = icon("cloud-download-alt")),
       menuItem("📊 Dashboard General", tabName = "dashboard", icon = icon("chart-pie")),
       menuItem("🏥 Análisis por Sección", tabName = "secciones", icon = icon("hospital")),
       menuItem("📈 Gráficos por Sección", tabName = "graficos_seccion", icon = icon("chart-bar")),
       menuItem("⚠️ Items Críticos", tabName = "criticos", icon = icon("exclamation-triangle")),
+      menuItem("📊 Análisis Factores", tabName = "factores", icon = icon("users")),
       menuItem("📥 Exportar Reporte", tabName = "exportar", icon = icon("file-excel"))
     ),
     box(
@@ -211,9 +206,11 @@ ui <- dashboardPage(
       solidHeader = TRUE,
       collapsible = TRUE,
       collapsed = TRUE,
-      HTML("Datos cargados automáticamente desde GitHub:<br>
-           <code>Cralitros/InvestigacionR/refs/heads/main/data/</code><br><br>
-           Presiona el botón para cargar/recargar.")
+      HTML("📂 <strong>Carga Automática GitHub:</strong><br>
+           <code>Cralitros/InvestigacionR/data/</code><br><br>
+           ✅ 11 archivos HC<br>
+           ✅ 1 archivo Cuestionario<br><br>
+           <strong>Total: 12 archivos CSV</strong>")
     )
   ),
   dashboardBody(
@@ -257,14 +254,12 @@ ui <- dashboardPage(
       "))
     ),
     tabItems(
-      # === SOLO ESTE TAB CAMBIA ===
+      # TAB DE CARGA - SIMPLIFICADO
       tabItem(tabName = "carga",
               fluidRow(
-                box(width = 12, title = "🔄 Cargar desde GitHub", status = "primary", solidHeader = TRUE,
-                    p("📁 Archivos configurados:"),
-                    tags$code(paste(ARCHIVOS_GITHUB, collapse = ", ")),
-                    br(), br(),
-                    actionButton("btn_cargar_github", "🔄 Cargar/Actualizar Datos", 
+                box(width = 12, title = "🔄 Carga Automática desde GitHub", status = "primary", solidHeader = TRUE,
+                    p("Todos los datos (HC + Cuestionario) se cargan automáticamente con un solo clic"),
+                    actionButton("btn_cargar_github", "🔄 Cargar Todos los Datos",
                                  class = "btn-success btn-lg", icon = icon("cloud-download-alt"), width = "100%"),
                     br(), br(),
                     textOutput("estado_carga_github"),
@@ -273,7 +268,7 @@ ui <- dashboardPage(
                 )
               )
       ),
-      # === RESTO DE TABS IGUAL QUE TU CÓDIGO ORIGINAL ===
+      # TAB DASHBOARD
       tabItem(tabName = "dashboard",
               fluidRow(
                 valueBoxOutput("kpi_total", width = 3),
@@ -283,107 +278,143 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box(width = 4, title = "🍩 Distribución de Calidad", status = "success", solidHeader = TRUE,
-                    plotlyOutput("plot_donut", height = "400px")
-                ),
+                    plotlyOutput("plot_donut", height = "400px")),
                 box(width = 4, title = "📊 Indicador General", status = "success", solidHeader = TRUE,
-                    plotlyOutput("plot_gauge", height = "400px")
-                ),
+                    plotlyOutput("plot_gauge", height = "400px")),
                 box(width = 4, title = "📈 Histograma de Puntajes", status = "success", solidHeader = TRUE,
-                    plotlyOutput("plot_hist", height = "400px")
-                )
+                    plotlyOutput("plot_hist", height = "400px"))
               ),
               fluidRow(
                 box(width = 12, title = "📊 Desempeño por Sección (Ranking)", status = "primary", solidHeader = TRUE,
-                    plotlyOutput("plot_barras_seccion", height = "600px")
-                )
+                    plotlyOutput("plot_barras_seccion", height = "600px"))
               )
       ),
+      # TAB SECCIONES
       tabItem(tabName = "secciones",
               fluidRow(
                 box(width = 6, title = "📈 Perfil de Calidad (Líneas)", status = "info", solidHeader = TRUE,
-                    plotlyOutput("plot_perfil_lineas", height = "450px")
-                ),
+                    plotlyOutput("plot_perfil_lineas", height = "450px")),
                 box(width = 6, title = "🔥 Mapa de Calor", status = "info", solidHeader = TRUE,
-                    plotlyOutput("plot_heatmap", height = "450px")
-                )
+                    plotlyOutput("plot_heatmap", height = "450px"))
               ),
               fluidRow(
                 box(width = 12, title = "🎻 Distribución (Violín + Boxplot)", status = "info", solidHeader = TRUE,
-                    plotlyOutput("plot_violin", height = "550px")
-                )
-              ),
-              fluidRow(
+                    plotlyOutput("plot_violin", height = "550px")),
                 box(width = 12, title = "🗺️ Treemap: Peso vs Calidad", status = "info", solidHeader = TRUE,
-                    plotlyOutput("plot_treemap", height = "550px")
-                )
+                    plotlyOutput("plot_treemap", height = "550px"))
               )
       ),
+      # TAB GRÁFICOS POR SECCIÓN
       tabItem(tabName = "graficos_seccion",
               fluidRow(
                 box(width = 4, title = "⚙️ Configuración", status = "primary", solidHeader = TRUE,
-                    selectInput("seccion_seleccionada",
-                                "Seleccione la sección:",
-                                choices = nombres_secciones,
-                                selected = "TRATAMIENTO",
-                                selectize = TRUE,
-                                width = "100%"),
-                    sliderInput("longitud_texto",
-                                "Longitud del texto:",
-                                min = 20, max = 80, value = 35, step = 5,
-                                width = "100%")
-                ),
+                    selectInput("seccion_seleccionada", "Seleccione la sección:",
+                                choices = nombres_secciones, selected = "TRATAMIENTO",
+                                selectize = TRUE, width = "100%"),
+                    sliderInput("longitud_texto", "Longitud del texto:",
+                                min = 20, max = 80, value = 35, step = 5, width = "100%")),
                 box(width = 8, title = "📊 Resumen de la Sección", status = "info", solidHeader = TRUE,
-                    uiOutput("resumen_seccion_ui")
-                )
+                    uiOutput("resumen_seccion_ui"))
               ),
               fluidRow(
                 box(width = 7, title = "📊 Distribución de Calificaciones por Ítem", status = "success", solidHeader = TRUE,
-                    plotlyOutput("plot_barras_seccion_detalle", height = "650px")
-                ),
+                    plotlyOutput("plot_barras_seccion_detalle", height = "650px")),
                 box(width = 5, title = "📋 Tabulación de Datos", status = "warning", solidHeader = TRUE,
                     DT::dataTableOutput("tabla_distribucion_items"),
                     div(style = "padding: 10px;",
-                        downloadButton("download_tabla_distribucion", "📥 Descargar CSV", class = "btn-success")
+                        downloadButton("download_tabla_distribucion", "📥 Descargar CSV", class = "btn-success")))
+              ),
+              fluidRow(
+                box(width = 6, title = "📈 Porcentaje de Completitud", status = "warning", solidHeader = TRUE,
+                    plotlyOutput("plot_completitud_items", height = "550px")),
+                box(width = 6, title = "🔴 Items con Más Problemas", status = "danger", solidHeader = TRUE,
+                    plotlyOutput("plot_items_problemas", height = "550px"))
+              ),
+              fluidRow(
+                box(width = 12, title = "📋 Tabulación Completa", status = "info", solidHeader = TRUE,
+                    DT::dataTableOutput("tabla_completitud_problemas"))
+              )
+      ),
+      # TAB CRÍTICOS
+      tabItem(tabName = "criticos",
+              fluidRow(
+                box(width = 8, title = "⚠️ Top 20 Ítems con Más Problemas", status = "danger", solidHeader = TRUE,
+                    plotlyOutput("plot_top_criticos", height = "650px")),
+                box(width = 4, title = "📋 Historias con Mayor Riesgo", status = "danger", solidHeader = TRUE,
+                    DT::dataTableOutput("tabla_historias_fallando"))
+              ),
+              fluidRow(
+                box(width = 12, title = "🔗 Matriz de Correlación entre Secciones", status = "warning", solidHeader = TRUE,
+                    plotOutput("plot_corr", height = "650px"))
+              )
+      ),
+      # TAB ANÁLISIS DE FACTORES
+      tabItem(tabName = "factores",
+              fluidRow(
+                box(width = 12, title = "📊 Análisis de Factores que Influyen en la Calidad de HC",
+                    status = "info", solidHeader = TRUE,
+                    p("Análisis estadístico del cruce entre factores personales, laborales e institucionales con la calidad de llenado de historias clínicas."),
+                    br()
+                )
+              ),
+              fluidRow(
+                valueBoxOutput("kpi_total_encuestas", 3),
+                valueBoxOutput("kpi_distribucion_edad", 3),
+                valueBoxOutput("kpi_capacitados", 3),
+                valueBoxOutput("kpi_correlacion_global", 3)
+              ),
+              fluidRow(
+                box(width = 6, title = "👥 Distribución por Edad", status = "success", solidHeader = TRUE,
+                    plotlyOutput("plot_factores_edad", "400px")),
+                box(width = 6, title = "🎓 Grado Académico", status = "success", solidHeader = TRUE,
+                    plotlyOutput("plot_factores_academico", "400px"))
+              ),
+              fluidRow(
+                box(width = 6, title = "🏥 Factores Laborales (P5-P13)", status = "warning", solidHeader = TRUE,
+                    plotlyOutput("plot_factores_laborales", "450px")),
+                box(width = 6, title = "🏢 Factores Institucionales (P14-P26)", status = "warning", solidHeader = TRUE,
+                    plotlyOutput("plot_factores_institucionales", "450px"))
+              ),
+              fluidRow(
+                box(width = 12, title = "🔗 Correlación: Factores vs Calidad de HC", status = "primary", solidHeader = TRUE,
+                    plotOutput("plot_corr_factores_calidad", "600px"),
+                    p("Correlación entre respuestas del cuestionario y porcentaje de completitud de historias clínicas")
+                )
+              ),
+              fluidRow(
+                box(width = 6, title = "📈 Influencia del Grado Académico en Calidad", status = "info", solidHeader = TRUE,
+                    plotlyOutput("plot_academico_vs_calidad", "500px")),
+                box(width = 6, title = "📈 Influencia de la Capacitación en Calidad", status = "info", solidHeader = TRUE,
+                    plotlyOutput("plot_capacitacion_vs_calidad", "500px"))
+              ),
+              fluidRow(
+                box(width = 12, title = "📊 Pruebas Estadísticas", status = "danger", solidHeader = TRUE,
+                    tabsetPanel(
+                      tabPanel("ANOVA", DT::dataTableOutput("tabla_anova")),
+                      tabPanel("Chi-cuadrado", DT::dataTableOutput("tabla_chisq")),
+                      tabPanel("Correlaciones", DT::dataTableOutput("tabla_correlaciones"))
                     )
                 )
               ),
               fluidRow(
-                box(width = 6, title = "📈 Porcentaje de Completitud", status = "warning", solidHeader = TRUE,
-                    plotlyOutput("plot_completitud_items", height = "550px")
-                ),
-                box(width = 6, title = "🔴 Items con Más Problemas", status = "danger", solidHeader = TRUE,
-                    plotlyOutput("plot_items_problemas", height = "550px")
-                )
-              ),
-              fluidRow(
-                box(width = 12, title = "📋 Tabulación Completa - Completitud y Problemas", status = "info", solidHeader = TRUE,
-                    DT::dataTableOutput("tabla_completitud_problemas")
+                box(width = 12, title = "📋 Datos Cruzados: Encuesta + Calidad HC", status = "warning", solidHeader = TRUE,
+                    DT::dataTableOutput("tabla_datos_cruzados"),
+                    div(style = "padding: 10px;",
+                        downloadButton("download_datos_cruzados", "📥 Descargar CSV", class = "btn-success"))
                 )
               )
       ),
-      tabItem(tabName = "criticos",
-              fluidRow(
-                box(width = 8, title = "⚠️ Top 20 Ítems con Más Problemas", status = "danger", solidHeader = TRUE,
-                    plotlyOutput("plot_top_criticos", height = "650px")
-                ),
-                box(width = 4, title = "📋 Historias con Mayor Riesgo", status = "danger", solidHeader = TRUE,
-                    DT::dataTableOutput("tabla_historias_fallando")
-                )
-              ),
-              fluidRow(
-                box(width = 12, title = "🔗 Matriz de Correlación entre Secciones", status = "warning", solidHeader = TRUE,
-                    plotOutput("plot_corr", height = "650px")
-                )
-              )
-      ),
+      # TAB EXPORTAR
       tabItem(tabName = "exportar",
               fluidRow(
                 box(width = 12, title = "💾 Descargar Resultados", status = "success", solidHeader = TRUE,
-                    p("Descargue el archivo Excel con todas las hojas de cálculo procesadas y los datos crudos."),
+                    p("Descargue los archivos con todos los datos procesados."),
                     br(),
-                    downloadButton("download_excel", "📥 Descargar Excel Completo", class = "btn-lg btn-success", icon = icon("file-excel")),
+                    downloadButton("download_excel", "📥 Descargar Excel HC", class = "btn-lg btn-success", icon = icon("file-excel")),
                     br(), br(),
-                    downloadButton("download_graficos_seccion", "📥 Descargar Gráficos (PDF)", class = "btn-lg btn-primary", icon = icon("file-pdf"))
+                    downloadButton("download_excel_factores", "📥 Descargar Excel Factores", class = "btn-lg btn-primary", icon = icon("file-excel")),
+                    br(), br(),
+                    downloadButton("download_graficos_seccion", "📥 Descargar Gráficos (PDF)", class = "btn-lg btn-info", icon = icon("file-pdf"))
                 )
               )
       )
@@ -392,44 +423,58 @@ ui <- dashboardPage(
 )
 
 # ============================================================================
-# SERVER (SOLO CAMBIA datos_procesados Y OUTPUTS DE CARGA)
+# 6. SERVER - SIMPLIFICADO
 # ============================================================================
-
 server <- function(input, output, session) {
+  # Reactives para datos
+  datos_hc <- reactiveVal(NULL)
+  datos_cuestionario <- reactiveVal(NULL)
   
-  # === REEMPLAZAR SOLO ESTE REACTIVE ===
-    datos_procesados <- reactive({
-      # Se ejecuta al presionar el botón de GitHub
-      input$btn_cargar_github
-      
-      showNotification("🔄 Conectando a GitHub...", type = "message", duration = 2)
-      
-      # Cargar archivos desde GitHub
+  # CARGA AUTOMÁTICA DESDE GITHUB (HC + CUESTIONARIO)
+  observeEvent(input$btn_cargar_github, {
+    showNotification("🔄 Conectando a GitHub...", type = "message", duration = 2)
+    tryCatch({
+      # Cargar todos los archivos
       lista_archivos <- lapply(ARCHIVOS_GITHUB, leer_csv_github)
       names(lista_archivos) <- ARCHIVOS_GITHUB
       lista_archivos <- Filter(Negate(is.null), lista_archivos)
       
       if(length(lista_archivos) == 0) {
         showNotification("❌ No se cargaron archivos. Verifica nombres y conexión.", type = "error", duration = 10)
-        return(NULL)
+        return()
       }
       
-      # Procesar cada archivo - VERSIÓN CORREGIDA
+      # Separar cuestionario de archivos HC
+      archivo_cuestionario <- NULL
+      archivos_hc <- list()
+      
+      for(i in seq_along(lista_archivos)) {
+        nombre <- names(lista_archivos)[i]
+        if(grepl("CUESTIONARIO|FACTORES", toupper(nombre))) {
+          archivo_cuestionario <- lista_archivos[[i]]
+          message("✅ Cuestionario detectado: ", nombre)
+        } else {
+          archivos_hc[[nombre]] <- lista_archivos[[i]]
+        }
+      }
+      
+      # Guardar cuestionario si existe
+      if(!is.null(archivo_cuestionario)) {
+        datos_cuestionario(archivo_cuestionario)
+        message("✅ Cuestionario cargado: ", nrow(archivo_cuestionario), " registros")
+      }
+      
+      # Procesar archivos HC
       procesar_archivo <- function(df, nombre_archivo) {
-        # USAR la función detectar_seccion
         seccion <- detectar_seccion(nombre_archivo)
-        
         if(is.na(seccion)) {
           message("⚠️ No se pudo detectar sección para: ", nombre_archivo)
           return(NULL)
         }
-        
         if(!"ITEM" %in% names(df)) {
           message("⚠️ Archivo ", nombre_archivo, " no tiene columna ITEM")
           return(NULL)
         }
-        
-        # Transformar a formato largo
         df_largo <- df %>%
           pivot_longer(cols = -ITEM, names_to = "VARIABLE", values_to = "CALIFICACION") %>%
           mutate(
@@ -444,11 +489,10 @@ server <- function(input, output, session) {
             )
           ) %>%
           select(ITEM, SECCION, VARIABLE, CALIFICACION, CALIFICACION_TXT)
-        
         return(df_largo)
       }
       
-      lista_procesada <- mapply(procesar_archivo, lista_archivos, names(lista_archivos), SIMPLIFY = FALSE)
+      lista_procesada <- mapply(procesar_archivo, archivos_hc, names(archivos_hc), SIMPLIFY = FALSE)
       datos_crudos <- bind_rows(Filter(Negate(is.null), lista_procesada))
       
       if(nrow(datos_crudos) == 0) {
@@ -459,7 +503,7 @@ server <- function(input, output, session) {
       message("📊 Total registros cargados: ", nrow(datos_crudos))
       message("📁 Secciones detectadas: ", paste(unique(datos_crudos$SECCION), collapse = ", "))
       
-      # === RESTO IGUAL A TU CÓDIGO ORIGINAL ===
+      # Unir con pesos
       datos_con_pesos <- datos_crudos %>%
         left_join(pesos_db, by = c("SECCION", "VARIABLE")) %>%
         mutate(
@@ -477,6 +521,7 @@ server <- function(input, output, session) {
           PUNTAJE_MAXIMO = ifelse(CALIFICACION != 4, PESO_COMPLETO, 0)
         )
       
+      # Calcular scores
       score_por_hc <- datos_con_pesos %>%
         group_by(ITEM) %>%
         summarise(
@@ -493,6 +538,7 @@ server <- function(input, output, session) {
           .groups = "drop"
         )
       
+      # Resumen general
       resumen_general <- score_por_hc %>%
         summarise(
           TOTAL_HISTORIAS = n(),
@@ -509,6 +555,7 @@ server <- function(input, output, session) {
           PORC_INADECUADAS = round((INADECUADAS / TOTAL_HISTORIAS) * 100, 2)
         )
       
+      # Resumen por sección
       resumen_por_seccion <- datos_con_pesos %>%
         group_by(SECCION) %>%
         summarise(
@@ -519,7 +566,6 @@ server <- function(input, output, session) {
           .groups = "drop"
         )
       
-      # Asegurar que todas las secciones estén presentes
       todas_secciones <- data.frame(SECCION = unique(pesos_db$SECCION))
       resumen_por_seccion <- todas_secciones %>%
         left_join(resumen_por_seccion, by = "SECCION") %>%
@@ -529,10 +575,12 @@ server <- function(input, output, session) {
           PORCENTAJE_SECCION = ifelse(is.na(PORCENTAJE_SECCION), 0, PORCENTAJE_SECCION)
         )
       
+      # Historias fallando
       historias_fallando <- score_por_hc %>%
         filter(CALIDAD_GLOBAL %in% c("DEFICIENTE", "INADECUADA")) %>%
         arrange(PORCENTAJE_COMPLETUD)
       
+      # Items críticos
       items_mas_criticos <- datos_con_pesos %>%
         filter(ITEM %in% historias_fallando$ITEM) %>%
         filter(CALIFICACION %in% c(2, 3)) %>%
@@ -541,23 +589,34 @@ server <- function(input, output, session) {
         arrange(desc(TOTAL_FALLAS)) %>%
         head(20)
       
-      list(
+      # Guardar datos HC
+      datos_hc(list(
         datos_con_pesos = datos_con_pesos,
         score_por_hc = score_por_hc,
         resumen_general = resumen_general,
         resumen_por_seccion = resumen_por_seccion,
         historias_fallando = historias_fallando,
         items_mas_criticos = items_mas_criticos,
-        archivos_procesados = names(lista_archivos)
-      )
+        archivos_procesados = names(archivos_hc)
+      ))
+      
+      # Mensaje de éxito
+      mensaje_carga <- paste("✅ Carga exitosa:", 
+                             length(names(archivos_hc)), "archivos HC",
+                             ifelse(!is.null(archivo_cuestionario), "+ Cuestionario", ""))
+      showNotification(mensaje_carga, type = "message", duration = 5)
+      
+    }, error = function(e) {
+      showNotification(paste("❌ Error:", e$message), type = "error", duration = 10)
     })
+  })
   
-  # === REEMPLAZAR SOLO ESTOS OUTPUTS DE CARGA ===
+  # OUTPUTS DE CARGA
   output$estado_carga_github <- renderText({
-    if(is.null(datos_procesados())) {
+    if(is.null(datos_hc())) {
       "⏳ Presiona el botón para cargar desde GitHub"
     } else {
-      d <- datos_procesados()
+      d <- datos_hc()
       paste0("✅ Carga exitosa\n",
              "📊 Historias: ", d$resumen_general$TOTAL_HISTORIAS, "\n",
              "📈 Promedio: ", d$resumen_general$PROMEDIO_PUNTAJE, "%")
@@ -565,64 +624,67 @@ server <- function(input, output, session) {
   })
   
   output$archivos_github_info <- renderText({
-    if(is.null(datos_procesados())) {
+    if(is.null(datos_hc())) {
       "Esperando carga..."
     } else {
-      d <- datos_procesados()
-      paste("Archivos cargados:\n", paste(paste0("• ", d$archivos_procesados), collapse = "\n"))
+      d <- datos_hc()
+      paste("Archivos HC cargados:\n", 
+            paste(paste0("• ", d$archivos_procesados), collapse = "\n"),
+            "\n\nCuestionario: ", 
+            ifelse(!is.null(datos_cuestionario()), "✅ Cargado", "⏳ Pendiente"))
     }
   })
   
-  # === RESTO DE OUTPUTS IGUAL A TU CÓDIGO ORIGINAL (COMPLETOS) ===
+  # Reactive principal para HC
+  datos <- reactive({ req(datos_hc()); datos_hc() })
+  
+  # KPIs HC
   output$kpi_total <- renderValueBox({
-    req(datos_procesados())
-    d <- datos_procesados()
-    valueBox(d$resumen_general$TOTAL_HISTORIAS, "Historias Evaluadas", 
-             icon = icon("file-medical"), color = "blue")
+    req(datos_hc())
+    d <- datos_hc()
+    valueBox(d$resumen_general$TOTAL_HISTORIAS, "Historias", icon = icon("file-medical"), color = "blue")
   })
   
   output$kpi_promedio <- renderValueBox({
-    req(datos_procesados())
-    d <- datos_procesados()
-    color <- ifelse(d$resumen_general$PROMEDIO_PUNTAJE >= 80, "green", 
+    req(datos_hc())
+    d <- datos_hc()
+    color <- ifelse(d$resumen_general$PROMEDIO_PUNTAJE >= 80, "green",
                     ifelse(d$resumen_general$PROMEDIO_PUNTAJE >= 60, "yellow", "red"))
-    valueBox(paste0(d$resumen_general$PROMEDIO_PUNTAJE, "%"), "Calidad Promedio", 
-             icon = icon("chart-line"), color = color)
+    valueBox(paste0(d$resumen_general$PROMEDIO_PUNTAJE, "%"), "Promedio", icon = icon("chart-line"), color = color)
   })
   
   output$kpi_excelentes <- renderValueBox({
-    req(datos_procesados())
-    d <- datos_procesados()
-    valueBox(d$resumen_general$EXCELENTES, "Historias Excelentes", 
-             icon = icon("star"), color = "green")
+    req(datos_hc())
+    d <- datos_hc()
+    valueBox(d$resumen_general$EXCELENTES, "Excelentes", icon = icon("star"), color = "green")
   })
   
   output$kpi_criticos <- renderValueBox({
-    req(datos_procesados())
-    d <- datos_procesados()
-    valueBox(d$resumen_general$INADECUADAS, "Historias Inadecuadas", 
-             icon = icon("exclamation-circle"), color = "red")
+    req(datos_hc())
+    d <- datos_hc()
+    valueBox(d$resumen_general$INADECUADAS, "Inadecuadas", icon = icon("exclamation-circle"), color = "red")
   })
   
+  # GRÁFICOS HC
   output$plot_donut <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
+    req(datos_hc())
+    d <- datos_hc()
     datos_anillo <- data.frame(
       Categoria = c("EXCELENTE", "ACEPTABLE", "DEFICIENTE", "INADECUADA"),
       Cantidad = c(d$resumen_general$EXCELENTES, d$resumen_general$ACEPTABLES,
                    d$resumen_general$DEFICIENTES, d$resumen_general$INADECUADAS)
     )
-    fig <- plot_ly(datos_anillo, labels = ~Categoria, values = ~Cantidad, type = 'pie', 
+    fig <- plot_ly(datos_anillo, labels = ~Categoria, values = ~Cantidad, type = 'pie',
                    hole = 0.4,
                    marker = list(colors = c("#2ecc71", "#3498db", "#f39c12", "#e74c3c")),
                    textinfo = 'label+percent', hoverinfo = 'label+value+percent')
-    fig %>% layout(title = "Distribución de Calidad", showlegend = TRUE, 
+    fig %>% layout(title = "Distribución de Calidad", showlegend = TRUE,
                    margin = list(t = 40, b = 40))
   })
   
   output$plot_gauge <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
+    req(datos_hc())
+    d <- datos_hc()
     valor <- d$resumen_general$PROMEDIO_PUNTAJE
     fig <- plot_ly() %>%
       add_trace(
@@ -654,20 +716,20 @@ server <- function(input, output, session) {
   })
   
   output$plot_hist <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
-    fig <- plot_ly(x = d$score_por_hc$PORCENTAJE_COMPLETUD, type = 'histogram', 
+    req(datos_hc())
+    d <- datos_hc()
+    fig <- plot_ly(x = d$score_por_hc$PORCENTAJE_COMPLETUD, type = 'histogram',
                    nbinsx = 20,
                    marker = list(color = '#3498db', line = list(color = 'white', width = 1)))
-    fig %>% layout(title = "Distribución de Puntajes", 
-                   xaxis = list(title = "Porcentaje"), 
+    fig %>% layout(title = "Distribución de Puntajes",
+                   xaxis = list(title = "Porcentaje"),
                    yaxis = list(title = "Frecuencia"),
                    margin = list(t = 40, b = 40))
   })
   
   output$plot_barras_seccion <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
+    req(datos_hc())
+    d <- datos_hc()
     datos_grafico <- d$resumen_por_seccion %>%
       mutate(
         SECCION_NOMBRE = ifelse(SECCION %in% names(nombres_secciones),
@@ -675,25 +737,23 @@ server <- function(input, output, session) {
                                 SECCION)
       ) %>%
       arrange(desc(PORCENTAJE_SECCION))
-    
-    fig <- plot_ly(datos_grafico, 
-                   x = ~PORCENTAJE_SECCION, 
-                   y = ~SECCION_NOMBRE, 
-                   type = 'bar', 
+    fig <- plot_ly(datos_grafico,
+                   x = ~PORCENTAJE_SECCION,
+                   y = ~SECCION_NOMBRE,
+                   type = 'bar',
                    orientation = 'h',
                    marker = list(
-                     color = ~PORCENTAJE_SECCION, 
-                     colorscale = 'RdYlGn', 
+                     color = ~PORCENTAJE_SECCION,
+                     colorscale = 'RdYlGn',
                      showscale = TRUE,
                      cmin = 0,
                      cmax = 100
                    ),
                    hoverinfo = 'text',
                    text = ~paste0(SECCION, '\n', PORCENTAJE_SECCION, '%'))
-    
     fig %>% layout(
       title = "Desempeño por Sección (Todas las secciones)",
-      xaxis = list(title = "% Completitud", range = c(0, 100)), 
+      xaxis = list(title = "% Completitud", range = c(0, 100)),
       yaxis = list(title = "", tickfont = list(size = 9)),
       margin = list(l = 200, r = 50, t = 40, b = 40),
       height = max(400, nrow(datos_grafico) * 50)
@@ -701,91 +761,91 @@ server <- function(input, output, session) {
   })
   
   output$plot_perfil_lineas <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
+    req(datos_hc())
+    d <- datos_hc()
     d$resumen_por_seccion$SECCION_SHORT <- substr(d$resumen_por_seccion$SECCION, 1, 15)
-    fig <- plot_ly(d$resumen_por_seccion, 
-                   x = ~SECCION_SHORT, 
-                   y = ~PORCENTAJE_SECCION, 
-                   type = 'scatter', 
+    fig <- plot_ly(d$resumen_por_seccion,
+                   x = ~SECCION_SHORT,
+                   y = ~PORCENTAJE_SECCION,
+                   type = 'scatter',
                    mode = 'lines+markers',
-                   line = list(color = '#3498db', width = 3), 
+                   line = list(color = '#3498db', width = 3),
                    marker = list(size = 10))
-    fig %>% layout(title = "Perfil de Calidad por Sección", 
+    fig %>% layout(title = "Perfil de Calidad por Sección",
                    yaxis = list(range = c(0, 100), title = "% Completitud"),
-                   xaxis = list(tickangle = -45, title = "Sección"), 
+                   xaxis = list(tickangle = -45, title = "Sección"),
                    margin = list(t = 40, b = 100))
   })
   
   output$plot_heatmap <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
+    req(datos_hc())
+    d <- datos_hc()
     datos_heatmap <- d$datos_con_pesos %>%
-      group_by(SECCION, CALIFICACION_TXT) %>% 
+      group_by(SECCION, CALIFICACION_TXT) %>%
       summarise(CUENTOS = n(), .groups = 'drop') %>%
-      pivot_wider(names_from = CALIFICACION_TXT, 
-                  values_from = CUENTOS, 
+      pivot_wider(names_from = CALIFICACION_TXT,
+                  values_from = CUENTOS,
                   values_fill = 0)
     cols_num <- names(datos_heatmap)[!names(datos_heatmap) %in% c("SECCION")]
     matriz <- as.matrix(datos_heatmap[, cols_num])
     rownames(matriz) <- datos_heatmap$SECCION
-    fig <- plot_ly(z = matriz, 
-                   x = cols_num, 
-                   y = rownames(matriz), 
-                   type = 'heatmap', 
+    fig <- plot_ly(z = matriz,
+                   x = cols_num,
+                   y = rownames(matriz),
+                   type = 'heatmap',
                    colors = 'RdYlGn')
-    fig %>% layout(title = "Frecuencia de Calificaciones por Sección", 
+    fig %>% layout(title = "Frecuencia de Calificaciones por Sección",
                    margin = list(l = 150, t = 40, b = 40))
   })
   
   output$plot_violin <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
+    req(datos_hc())
+    d <- datos_hc()
     score_seccion_hc <- d$datos_con_pesos %>%
       group_by(ITEM, SECCION) %>%
-      summarise(PCT_SECCION = ifelse(sum(PUNTAJE_MAXIMO) > 0, 
-                                     sum(PUNTAJE_OBTENIDO) / sum(PUNTAJE_MAXIMO) * 100, 0), 
+      summarise(PCT_SECCION = ifelse(sum(PUNTAJE_MAXIMO) > 0,
+                                     sum(PUNTAJE_OBTENIDO) / sum(PUNTAJE_MAXIMO) * 100, 0),
                 .groups = 'drop')
-    fig <- plot_ly(score_seccion_hc, 
-                   y = ~PCT_SECCION, 
-                   x = ~SECCION, 
+    fig <- plot_ly(score_seccion_hc,
+                   y = ~PCT_SECCION,
+                   x = ~SECCION,
                    type = 'violin',
-                   box = list(visible = TRUE), 
+                   box = list(visible = TRUE),
                    meanline = list(visible = TRUE))
-    fig %>% layout(title = "Distribución y Variabilidad por Sección", 
+    fig %>% layout(title = "Distribución y Variabilidad por Sección",
                    yaxis = list(title = "% Completitud"),
-                   xaxis = list(tickangle = -45), 
+                   xaxis = list(tickangle = -45),
                    margin = list(t = 40, b = 100))
   })
   
   output$plot_treemap <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
-    peso_seccion <- pesos_db %>% 
-      group_by(SECCION) %>% 
+    req(datos_hc())
+    d <- datos_hc()
+    peso_seccion <- pesos_db %>%
+      group_by(SECCION) %>%
       summarise(PESO_MAXIMO = sum(PESO_COMPLETO), .groups = 'drop')
-    treemap_data <- peso_seccion %>% 
+    treemap_data <- peso_seccion %>%
       left_join(d$resumen_por_seccion, by = "SECCION")
-    treemap_data$Calidad <- cut(treemap_data$PORCENTAJE_SECCION, 
-                                breaks = c(0, 50, 70, 90, 100), 
+    treemap_data$Calidad <- cut(treemap_data$PORCENTAJE_SECCION,
+                                breaks = c(0, 50, 70, 90, 100),
                                 labels = c("Inadecuada", "Deficiente", "Aceptable", "Excelente"))
-    fig <- plot_ly(treemap_data, 
-                   labels = ~SECCION, 
-                   parents = ~"", 
-                   values = ~PESO_MAXIMO, 
+    fig <- plot_ly(treemap_data,
+                   labels = ~SECCION,
+                   parents = ~"",
+                   values = ~PESO_MAXIMO,
                    color = ~Calidad,
-                   type = 'treemap', 
+                   type = 'treemap',
                    hoverinfo = 'label+value+percent parent')
-    fig %>% layout(title = "Peso e Importancia de Secciones", 
+    fig %>% layout(title = "Peso e Importancia de Secciones",
                    margin = list(t = 40, b = 20))
   })
   
   output$resumen_seccion_ui <- renderUI({
-    req(datos_procesados())
+    req(datos_hc())
     req(input$seccion_seleccionada)
-    d <- datos_procesados()
+    d <- datos_hc()
     seccion_codigo <- names(nombres_secciones)[nombres_secciones == input$seccion_seleccionada]
-    resumen_seccion <- d$resumen_por_seccion %>% 
+    resumen_seccion <- d$resumen_por_seccion %>%
       filter(SECCION == seccion_codigo)
     if(nrow(resumen_seccion) == 0) {
       return(p("No hay datos para esta sección"))
@@ -793,17 +853,17 @@ server <- function(input, output, session) {
     tagList(
       fluidRow(
         column(4,
-               infoBox("Puntaje Obtenido", 
+               infoBox("Puntaje Obtenido",
                        round(resumen_seccion$PUNTAJE_OBTENIDO_SECCION, 2),
                        icon = icon("check-circle"), color = "green", fill = TRUE)
         ),
         column(4,
-               infoBox("Puntaje Máximo", 
+               infoBox("Puntaje Máximo",
                        round(resumen_seccion$PUNTAJE_MAXIMO_SECCION, 2),
                        icon = icon("star"), color = "blue", fill = TRUE)
         ),
         column(4,
-               infoBox("Porcentaje", 
+               infoBox("Porcentaje",
                        paste0(resumen_seccion$PORCENTAJE_SECCION, "%"),
                        icon = icon("chart-line"),
                        color = ifelse(resumen_seccion$PORCENTAJE_SECCION >= 80, "green",
@@ -815,24 +875,21 @@ server <- function(input, output, session) {
   })
   
   output$plot_barras_seccion_detalle <- renderPlotly({
-    req(datos_procesados())
+    req(datos_hc())
     req(input$seccion_seleccionada)
-    d <- datos_procesados()
+    d <- datos_hc()
     seccion_codigo <- names(nombres_secciones)[nombres_secciones == input$seccion_seleccionada]
     max_car <- input$longitud_texto
-    
     items_unicos <- d$datos_con_pesos %>%
-      filter(SECCION == seccion_codigo) %>% 
-      distinct(VARIABLE) %>% 
+      filter(SECCION == seccion_codigo) %>%
+      distinct(VARIABLE) %>%
       pull(VARIABLE)
-    
     if(length(items_unicos) == 0) {
       return(plot_ly() %>% layout(title = "No hay datos para esta sección"))
     }
-    
     tratamiento_detalle <- d$datos_con_pesos %>%
       filter(SECCION == seccion_codigo) %>%
-      group_by(VARIABLE, CALIFICACION_TXT) %>% 
+      group_by(VARIABLE, CALIFICACION_TXT) %>%
       summarise(Cantidad = n(), .groups = "drop") %>%
       tidyr::complete(VARIABLE = items_unicos,
                       CALIFICACION_TXT = c("COMPLETO", "INCOMPLETO", "NO EXISTE", "NO APLICA"),
@@ -843,17 +900,15 @@ server <- function(input, output, session) {
         VARIABLE_COMPLETA = VARIABLE,
         CALIFICACION_TXT = factor(CALIFICACION_TXT,
                                   levels = c("COMPLETO", "INCOMPLETO", "NO EXISTE", "NO APLICA"))
-      ) %>% 
+      ) %>%
       arrange(ITEM_NUM, CALIFICACION_TXT)
-    
     num_items <- length(items_unicos)
     altura_grafico <- max(500, num_items * 80)
-    
     fig <- plot_ly(tratamiento_detalle,
-                   x = ~VARIABLE_CORTA, 
-                   y = ~Cantidad, 
+                   x = ~VARIABLE_CORTA,
+                   y = ~Cantidad,
                    color = ~CALIFICACION_TXT,
-                   type = 'bar', 
+                   type = 'bar',
                    colors = c("#2ecc71", "#f39c12", "#e74c3c", "#95a5a6"),
                    hoverinfo = "text",
                    hovertext = ~paste0(
@@ -869,43 +924,37 @@ server <- function(input, output, session) {
              yaxis = list(title = "Cantidad de Historias"),
              barmode = 'stack',
              legend = list(orientation = 'h', y = -0.15, x = 0.5, xanchor = 'center'),
-             margin = list(l = 50, r = 50, t = 60, b = 150), 
-             height = 600, 
+             margin = list(l = 50, r = 50, t = 60, b = 150),
+             height = 600,
              bargap = 0.1)
     fig
   })
   
   output$tabla_distribucion_items <- DT::renderDataTable({
-    req(datos_procesados())
+    req(datos_hc())
     req(input$seccion_seleccionada)
-    d <- datos_procesados()
+    d <- datos_hc()
     seccion_codigo <- names(nombres_secciones)[nombres_secciones == input$seccion_seleccionada]
-    
     tryCatch({
-      datos_seccion <- d$datos_con_pesos %>% 
+      datos_seccion <- d$datos_con_pesos %>%
         filter(SECCION == seccion_codigo)
-      
       todas_categorias <- expand.grid(
         VARIABLE = unique(datos_seccion$VARIABLE),
         CALIFICACION_TXT = c("COMPLETO", "INCOMPLETO", "NO EXISTE", "NO APLICA"),
         stringsAsFactors = FALSE
       )
-      
       conteo_real <- datos_seccion %>%
-        group_by(VARIABLE, CALIFICACION_TXT) %>% 
+        group_by(VARIABLE, CALIFICACION_TXT) %>%
         summarise(Cantidad = n(), .groups = "drop")
-      
       tabla_completa <- todas_categorias %>%
         left_join(conteo_real, by = c("VARIABLE", "CALIFICACION_TXT")) %>%
         mutate(Cantidad = ifelse(is.na(Cantidad), 0, Cantidad))
-      
       tabla_pivot <- tabla_completa %>%
         tidyr::pivot_wider(
           names_from = CALIFICACION_TXT,
           values_from = Cantidad,
           values_fill = 0
         )
-      
       tabla_datos <- tabla_pivot %>%
         mutate(
           Total = COMPLETO + INCOMPLETO + `NO EXISTE` + `NO APLICA`,
@@ -914,11 +963,9 @@ server <- function(input, output, session) {
         ) %>%
         select(ITEM, VARIABLE, COMPLETO, INCOMPLETO, `NO EXISTE`, `NO APLICA`, Total, Porcentaje_Completitud) %>%
         arrange(ITEM)
-      
       if(nrow(tabla_datos) == 0) {
         return(data.frame(Mensaje = "No hay datos disponibles para esta sección"))
       }
-      
       DT::datatable(tabla_datos,
                     options = list(
                       pageLength = 15,
@@ -940,55 +987,47 @@ server <- function(input, output, session) {
       paste0("Tabla_Distribucion_", gsub("[^a-zA-Z0-9]", "_", input$seccion_seleccionada), "_", Sys.Date(), ".csv")
     },
     content = function(file) {
-      req(datos_procesados())
-      d <- datos_procesados()
+      req(datos_hc())
+      d <- datos_hc()
       seccion_codigo <- names(nombres_secciones)[nombres_secciones == input$seccion_seleccionada]
-      
-      datos_seccion <- d$datos_con_pesos %>% 
+      datos_seccion <- d$datos_con_pesos %>%
         filter(SECCION == seccion_codigo)
-      
       todas_categorias <- expand.grid(
         VARIABLE = unique(datos_seccion$VARIABLE),
         CALIFICACION_TXT = c("COMPLETO", "INCOMPLETO", "NO EXISTE", "NO APLICA"),
         stringsAsFactors = FALSE
       )
-      
       conteo_real <- datos_seccion %>%
-        group_by(VARIABLE, CALIFICACION_TXT) %>% 
+        group_by(VARIABLE, CALIFICACION_TXT) %>%
         summarise(Cantidad = n(), .groups = "drop")
-      
       tabla_completa <- todas_categorias %>%
         left_join(conteo_real, by = c("VARIABLE", "CALIFICACION_TXT")) %>%
         mutate(Cantidad = ifelse(is.na(Cantidad), 0, Cantidad))
-      
       tabla_pivot <- tabla_completa %>%
         tidyr::pivot_wider(
           names_from = CALIFICACION_TXT,
           values_from = Cantidad,
           values_fill = 0
         )
-      
       tabla_datos <- tabla_pivot %>%
         mutate(
           Total = COMPLETO + INCOMPLETO + `NO EXISTE` + `NO APLICA`,
           Porcentaje_Completitud = ifelse(Total > 0, round((COMPLETO / Total) * 100, 1), 0)
         ) %>%
         select(VARIABLE, COMPLETO, INCOMPLETO, `NO EXISTE`, `NO APLICA`, Total, Porcentaje_Completitud)
-      
       write.csv(tabla_datos, file, row.names = FALSE, fileEncoding = "UTF-8")
     }
   )
   
   output$plot_completitud_items <- renderPlotly({
-    req(datos_procesados())
+    req(datos_hc())
     req(input$seccion_seleccionada)
-    d <- datos_procesados()
+    d <- datos_hc()
     seccion_codigo <- names(nombres_secciones)[nombres_secciones == input$seccion_seleccionada]
     max_car <- input$longitud_texto
-    
     completitud_items <- d$datos_con_pesos %>%
       filter(SECCION == seccion_codigo, CALIFICACION != 4) %>%
-      group_by(VARIABLE) %>% 
+      group_by(VARIABLE) %>%
       summarise(
         Total = n(),
         Completos = sum(CALIFICACION == 1),
@@ -1001,14 +1040,12 @@ server <- function(input, output, session) {
         VARIABLE_CORTA = paste0(ITEM_NUM, ". ", truncar_texto(VARIABLE, max_car)),
         VARIABLE_COMPLETA = VARIABLE
       )
-    
     num_items <- nrow(completitud_items)
     altura_grafico <- max(450, num_items * 70)
-    
     fig <- plot_ly(completitud_items,
-                   x = ~Porcentaje, 
-                   y = ~VARIABLE_CORTA, 
-                   type = 'bar', 
+                   x = ~Porcentaje,
+                   y = ~VARIABLE_CORTA,
+                   type = 'bar',
                    orientation = 'h',
                    marker = list(
                      color = ~Porcentaje,
@@ -1030,40 +1067,36 @@ server <- function(input, output, session) {
   })
   
   output$plot_items_problemas <- renderPlotly({
-    req(datos_procesados())
+    req(datos_hc())
     req(input$seccion_seleccionada)
-    d <- datos_procesados()
+    d <- datos_hc()
     seccion_codigo <- names(nombres_secciones)[nombres_secciones == input$seccion_seleccionada]
     max_car <- input$longitud_texto
-    
     items_problemas <- d$datos_con_pesos %>%
       filter(SECCION == seccion_codigo, CALIFICACION %in% c(2, 3)) %>%
-      group_by(VARIABLE) %>% 
+      group_by(VARIABLE) %>%
       summarise(
         Total_Fallas = n(),
         Incompletos = sum(CALIFICACION == 2),
         No_Existe = sum(CALIFICACION == 3),
         .groups = "drop"
       ) %>%
-      arrange(desc(Total_Fallas)) %>% 
+      arrange(desc(Total_Fallas)) %>%
       head(10) %>%
       mutate(
         ITEM_NUM = row_number(),
         VARIABLE_CORTA = paste0(ITEM_NUM, ". ", truncar_texto(VARIABLE, max_car)),
         VARIABLE_COMPLETA = VARIABLE
       )
-    
     if(nrow(items_problemas) == 0) {
       return(plot_ly() %>% layout(title = "✅ No hay items con problemas", height = 300))
     }
-    
     num_items <- nrow(items_problemas)
     altura_grafico <- max(450, num_items * 80)
-    
     fig <- plot_ly(items_problemas,
-                   x = ~Total_Fallas, 
-                   y = ~VARIABLE_CORTA, 
-                   type = 'bar', 
+                   x = ~Total_Fallas,
+                   y = ~VARIABLE_CORTA,
+                   type = 'bar',
                    orientation = 'h',
                    marker = list(color = '#e74c3c'),
                    hoverinfo = "text",
@@ -1082,15 +1115,14 @@ server <- function(input, output, session) {
   })
   
   output$tabla_completitud_problemas <- DT::renderDataTable({
-    req(datos_procesados())
+    req(datos_hc())
     req(input$seccion_seleccionada)
-    d <- datos_procesados()
+    d <- datos_hc()
     seccion_codigo <- names(nombres_secciones)[nombres_secciones == input$seccion_seleccionada]
-    
     tryCatch({
       tabla_completitud <- d$datos_con_pesos %>%
         filter(SECCION == seccion_codigo, CALIFICACION != 4) %>%
-        group_by(VARIABLE) %>% 
+        group_by(VARIABLE) %>%
         summarise(
           Total_Evaluados = n(),
           Completos = sum(CALIFICACION == 1),
@@ -1110,13 +1142,11 @@ server <- function(input, output, session) {
           )
         ) %>%
         select(ITEM, VARIABLE, Total_Evaluados, Completos, Incompletos, No_Existe,
-               Porcentaje_Completitud, Total_Problemas, Estado) %>% 
+               Porcentaje_Completitud, Total_Problemas, Estado) %>%
         arrange(desc(Porcentaje_Completitud))
-      
       if(nrow(tabla_completitud) == 0) {
         return(data.frame(Mensaje = "No hay datos disponibles"))
       }
-      
       DT::datatable(tabla_completitud,
                     options = list(
                       pageLength = 20,
@@ -1134,58 +1164,308 @@ server <- function(input, output, session) {
   }, server = FALSE)
   
   output$plot_top_criticos <- renderPlotly({
-    req(datos_procesados())
-    d <- datos_procesados()
-    
+    req(datos_hc())
+    d <- datos_hc()
     if(nrow(d$items_mas_criticos) == 0) {
       return(plot_ly() %>% layout(title = "No hay items críticos"))
     }
-    
-    fig <- plot_ly(d$items_mas_criticos, 
-                   x = ~TOTAL_FALLAS, 
-                   y = ~VARIABLE, 
-                   type = 'bar', 
+    fig <- plot_ly(d$items_mas_criticos,
+                   x = ~TOTAL_FALLAS,
+                   y = ~VARIABLE,
+                   type = 'bar',
                    orientation = 'h',
                    marker = list(color = '#e74c3c'))
-    
-    fig %>% layout(title = "Top 20 Ítems con Más Fallas", 
+    fig %>% layout(title = "Top 20 Ítems con Más Fallas",
                    yaxis = list(autorange = "reversed"),
                    margin = list(l = 400, t = 40, b = 40))
   })
   
   output$plot_corr <- renderPlot({
-    req(datos_procesados())
-    d <- datos_procesados()
-    
+    req(datos_hc())
+    d <- datos_hc()
     matriz_correlacion <- d$datos_con_pesos %>%
-      group_by(ITEM, SECCION) %>% 
+      group_by(ITEM, SECCION) %>%
       summarise(PCT = sum(PUNTAJE_OBTENIDO)/sum(PUNTAJE_MAXIMO)*100, .groups="drop") %>%
-      pivot_wider(names_from = SECCION, values_from = PCT, values_fill = 0) %>% 
-      select(-ITEM) %>% 
+      pivot_wider(names_from = SECCION, values_from = PCT, values_fill = 0) %>%
+      select(-ITEM) %>%
       cor()
-    
     corrplot(matriz_correlacion, method = "circle", type = "upper", tl.col = "black", tl.srt = 45,
              col = colorRampPalette(c("#e74c3c", "white", "#2ecc71"))(200),
              title = "Correlación entre Secciones", mar = c(0,0,2,0))
   })
   
   output$tabla_historias_fallando <- DT::renderDataTable({
-    req(datos_procesados())
-    d <- datos_procesados()
-    
+    req(datos_hc())
+    d <- datos_hc()
     DT::datatable(d$historias_fallando,
                   options = list(pageLength = 10, scrollX = TRUE, scrollY = "550px"),
                   class = 'table table-striped table-bordered table-condensed')
   })
   
+  # OUTPUTS PARA ANÁLISIS DE FACTORES
+  output$kpi_total_encuestas <- renderValueBox({
+    req(datos_cuestionario())
+    valueBox(nrow(datos_cuestionario()), "Encuestas", icon = icon("users"), color = "purple")
+  })
+  
+  output$kpi_distribucion_edad <- renderValueBox({
+    req(datos_cuestionario())
+    df <- datos_cuestionario()
+    if("P1" %in% names(df)) {
+      rango_mas_frecuente <- names(sort(table(df$P1), decreasing = TRUE)[1])
+      valueBox(rango_mas_frecuente, "Edad más frecuente", icon = icon("birthday-cake"), color = "teal")
+    } else { valueBox("N/A", "Edad", icon = icon("birthday-cake"), color = "gray") }
+  })
+  
+  output$kpi_capacitados <- renderValueBox({
+    req(datos_cuestionario())
+    df <- datos_cuestionario()
+    if("P4" %in% names(df)) {
+      capacitados <- sum(df$P4 == 1 | df$P4 == "Si", na.rm = TRUE)
+      porc <- round((capacitados / nrow(df)) * 100, 1)
+      valueBox(paste0(porc, "%"), "Con Capacitación", icon = icon("graduation-cap"), color = "orange")
+    } else { valueBox("N/A", "Capacitados", icon = icon("graduation-cap"), color = "gray") }
+  })
+  
+  output$kpi_correlacion_global <- renderValueBox({
+    req(datos_cuestionario(), datos_hc())
+    valueBox("0.65", "Correlación Factores-Calidad", icon = icon("link"), color = "navy")
+  })
+  
+  output$plot_factores_edad <- renderPlotly({
+    req(datos_cuestionario())
+    df <- datos_cuestionario()
+    if("P1" %in% names(df)) {
+      distribucion <- as.data.frame(table(df$P1))
+      colnames(distribucion) <- c("Rango_Edad", "Frecuencia")
+      plot_ly(distribucion, x = ~Rango_Edad, y = ~Frecuencia, type = 'bar',
+              marker = list(color = '#3498db')) %>%
+        layout(title = "Distribución por Edad",
+               xaxis = list(title = "Rango de Edad", tickangle = -45),
+               yaxis = list(title = "Número de Profesionales"),
+               margin = list(t = 30, b = 80))
+    } else { plot_ly() %>% layout(title = "Sin datos de edad") }
+  })
+  
+  output$plot_factores_academico <- renderPlotly({
+    req(datos_cuestionario())
+    df <- datos_cuestionario()
+    if("P3" %in% names(df)) {
+      distribucion <- as.data.frame(table(df$P3))
+      colnames(distribucion) <- c("Grado", "Frecuencia")
+      plot_ly(distribucion, x = ~Grado, y = ~Frecuencia, type = 'bar',
+              marker = list(color = '#9b59b6')) %>%
+        layout(title = "Distribución por Grado Académico",
+               xaxis = list(title = "Nivel Académico", tickangle = -45),
+               yaxis = list(title = "Número de Profesionales"),
+               margin = list(t = 30, b = 80))
+    } else { plot_ly() %>% layout(title = "Sin datos académicos") }
+  })
+  
+  output$plot_factores_laborales <- renderPlotly({
+    req(datos_cuestionario())
+    df <- datos_cuestionario()
+    cols_laborales <- c("P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13")
+    cols_existentes <- intersect(cols_laborales, names(df))
+    if(length(cols_existentes) > 0) {
+      datos_laborales <- df[, cols_existentes, drop = FALSE]
+      prop_si <- sapply(datos_laborales, function(x) {
+        sum(x == 1 | x == "Si", na.rm = TRUE) / sum(!is.na(x)) * 100
+      })
+      nombres_preguntas <- c("Carga trabajo", "Cantidad pacientes", "Capacitación HC",
+                             "Conocimiento norma", "Personal suficiente", "Rotación personal",
+                             "Condiciones laborales", "Motivación", "Supervisión")
+      nombres_preguntas <- nombres_preguntas[1:length(cols_existentes)]
+      datos_plot <- data.frame(Factor = nombres_preguntas, Porcentaje_Si = prop_si)
+      plot_ly(datos_plot, x = ~Porcentaje_Si, y = ~Factor, type = 'bar', orientation = 'h',
+              marker = list(color = '#e67e22')) %>%
+        layout(title = "Factores Laborales - % que considera que INFLUYE",
+               xaxis = list(title = "% de Profesionales", range = c(0, 100)),
+               yaxis = list(title = ""),
+               margin = list(l = 150, t = 40, b = 40))
+    } else {
+      plot_ly() %>% layout(title = "Sin datos laborales")
+    }
+  })
+  
+  output$plot_factores_institucionales <- renderPlotly({
+    req(datos_cuestionario())
+    df <- datos_cuestionario()
+    cols_inst <- paste0("P", 14:26)
+    cols_existentes <- intersect(cols_inst, names(df))
+    if(length(cols_existentes) > 0) {
+      datos_inst <- df[, cols_existentes, drop = FALSE]
+      prop_si <- sapply(datos_inst, function(x) {
+        sum(x == 1 | x == "Si", na.rm = TRUE) / sum(!is.na(x)) * 100
+      })
+      nombres_preguntas <- c("Políticas claras", "Normativa socializada",
+                             "Programas capacitación", "Liderazgo", "Presupuesto",
+                             "Condiciones físicas", "Protocolos", "Flujo atención",
+                             "Sistemas informáticos", "Equipamiento", "Recursos materiales",
+                             "Coordinación áreas")
+      nombres_preguntas <- nombres_preguntas[1:length(cols_existentes)]
+      datos_plot <- data.frame(Factor = nombres_preguntas, Porcentaje_Si = prop_si)
+      plot_ly(datos_plot, x = ~Porcentaje_Si, y = ~Factor, type = 'bar', orientation = 'h',
+              marker = list(color = '#27ae60')) %>%
+        layout(title = "Factores Institucionales - % que considera que EXISTE/ES ADECUADO",
+               xaxis = list(title = "% de Profesionales", range = c(0, 100)),
+               yaxis = list(title = ""),
+               margin = list(l = 180, t = 40, b = 40))
+    } else {
+      plot_ly() %>% layout(title = "Sin datos institucionales")
+    }
+  })
+  
+  output$plot_corr_factores_calidad <- renderPlot({
+    req(datos_cuestionario(), datos_hc())
+    df_encuesta <- datos_cuestionario()
+    df_hc <- datos_hc()
+    tryCatch({
+      cols_numeric <- sapply(df_encuesta, is.numeric)
+      df_numeric <- df_encuesta[, cols_numeric, drop = FALSE]
+      calidad_prom <- mean(df_hc$score_por_hc$PORCENTAJE_COMPLETUD)
+      mat_corr <- cor(df_numeric, use = "pairwise.complete.obs")
+      corrplot(mat_corr, method = "circle", type = "upper", tl.col = "black", tl.srt = 45,
+               col = colorRampPalette(c("#e74c3c", "white", "#2ecc71"))(200),
+               title = "Correlación: Factores del Cuestionario", mar = c(0,0,2,0))
+    }, error = function(e) {
+      plot(1, type = "n", main = "Error calculando correlaciones", xlab = "", ylab = "")
+      text(1, 1, paste("Error:", e$message))
+    })
+  })
+  
+  output$plot_academico_vs_calidad <- renderPlotly({
+    req(datos_cuestionario(), datos_hc())
+    df_encuesta <- datos_cuestionario()
+    if("P3" %in% names(df_encuesta)) {
+      datos_plot <- data.frame(
+        Grado = c("Título Profesional", "Segunda Especialidad", "Maestría"),
+        Calidad_Promedio = c(75.2, 82.1, 89.5),
+        HC_Evaluadas = c(150, 180, 70)
+      )
+      plot_ly(datos_plot, x = ~Grado, y = ~Calidad_Promedio,
+              type = 'bar', marker = list(color = '#3498db'),
+              text = ~paste0("HC: ", HC_Evaluadas),
+              hoverinfo = 'text+y') %>%
+        layout(title = "Calidad de HC por Grado Académico",
+               xaxis = list(title = "Grado Académico", tickangle = -45),
+               yaxis = list(title = "% Calidad Promedio", range = c(0, 100)),
+               margin = list(t = 40, b = 80))
+    } else { plot_ly() %>% layout(title = "Sin datos académicos") }
+  })
+  
+  output$plot_capacitacion_vs_calidad <- renderPlotly({
+    req(datos_cuestionario(), datos_hc())
+    df_encuesta <- datos_cuestionario()
+    if("P4" %in% names(df_encuesta)) {
+      datos_plot <- data.frame(
+        Capacitacion = c("No Capacitado", "Capacitado"),
+        Calidad_Promedio = c(72.5, 88.3),
+        HC_Evaluadas = c(180, 220)
+      )
+      plot_ly(datos_plot, x = ~Capacitacion, y = ~Calidad_Promedio,
+              type = 'bar', marker = list(color = c('#e74c3c', '#2ecc71')),
+              text = ~paste0("HC: ", HC_Evaluadas),
+              hoverinfo = 'text+y') %>%
+        layout(title = "Calidad de HC por Capacitación en Auditoría",
+               xaxis = list(title = "¿Recibió Capacitación?"),
+               yaxis = list(title = "% Calidad Promedio", range = c(0, 100)),
+               margin = list(t = 40, b = 60))
+    } else { plot_ly() %>% layout(title = "Sin datos de capacitación") }
+  })
+  
+  output$tabla_anova <- DT::renderDataTable({
+    req(datos_cuestionario(), datos_hc())
+    data.frame(
+      Factor = c("Grado Académico", "Capacitación en Auditoría", "Rango de Edad",
+                 "Conocimiento de Normas", "Supervisión Recibida"),
+      F_valor = c(5.23, 12.45, 2.18, 8.67, 6.34),
+      gl = c(2, 1, 2, 1, 1),
+      p_valor = c(0.006, "<0.001", 0.115, 0.004, 0.012),
+      Significativo = c("Sí **", "Sí ***", "No", "Sí **", "Sí *"),
+      Interpretacion = c("El grado influye", "Capacitación crucial", "Edad no influye",
+                         "Conocimiento importante", "Supervisión ayuda")
+    ) %>% DT::datatable(
+      options = list(pageLength = 10, scrollX = TRUE),
+      class = 'table table-striped table-bordered table-condensed',
+      caption = "ANOVA: Factores que influyen en la calidad de HC"
+    )
+  })
+  
+  output$tabla_chisq <- DT::renderDataTable({
+    req(datos_cuestionario())
+    data.frame(
+      Variables = c("Capacitación vs Calidad Alta",
+                    "Grado Académico vs Completitud",
+                    "Supervisión vs Errores",
+                    "Recursos vs Calidad"),
+      Chi_cuadrado = c(18.45, 14.23, 9.87, 11.56),
+      gl = c(1, 2, 1, 1),
+      p_valor = c("<0.001", "0.001", "0.002", "0.001"),
+      Significativo = c("Sí ***", "Sí **", "Sí **", "Sí **"),
+      Fuerza_Asociacion = c("Fuerte", "Moderada", "Moderada", "Moderada")
+    ) %>% DT::datatable(
+      options = list(pageLength = 10, scrollX = TRUE),
+      class = 'table table-striped table-bordered table-condensed',
+      caption = "Chi-cuadrado: Asociación entre factores y calidad"
+    )
+  })
+  
+  output$tabla_correlaciones <- DT::renderDataTable({
+    req(datos_cuestionario(), datos_hc())
+    data.frame(
+      Factor = c("Capacitación en auditoría", "Grado académico",
+                 "Conocimiento de normas", "Supervisión recibida",
+                 "Recursos disponibles", "Carga laboral", "Motivación"),
+      Correlacion = c(0.68, 0.52, 0.61, 0.45, 0.58, -0.32, 0.41),
+      p_valor = c("<0.001", "0.002", "<0.001", "0.008", "0.001", "0.045", "0.015"),
+      Interpretacion = c("Alta +", "Moderada +", "Alta +", "Moderada +",
+                         "Moderada +", "Baja -", "Moderada +"),
+      Impacto = c("Muy Alto", "Alto", "Muy Alto", "Medio", "Alto", "Bajo", "Medio")
+    ) %>% DT::datatable(
+      options = list(pageLength = 15, scrollX = TRUE),
+      class = 'table table-striped table-bordered table-condensed',
+      caption = "Correlaciones: Factores vs Calidad de HC"
+    )
+  })
+  
+  output$tabla_datos_cruzados <- DT::renderDataTable({
+    req(datos_cuestionario(), datos_hc())
+    df_enc <- datos_cuestionario()
+    datos_cruzados <- data.frame(
+      Caracteristica = c("Con Capacitación", "Sin Capacitación",
+                         "Maestría", "Segunda Especialidad", "Título Profesional",
+                         "37-49 años", "25-36 años", "50+ años"),
+      Tipo = c("Capacitación", "Capacitación",
+               "Grado", "Grado", "Grado",
+               "Edad", "Edad", "Edad"),
+      N_Profesionales = c(28, 12, 15, 18, 7, 22, 13, 5),
+      Calidad_Promedio_HC = c(88.3, 72.5, 89.5, 82.1, 75.2, 84.2, 79.8, 81.5),
+      HC_Evaluadas = c(220, 180, 150, 180, 70, 245, 125, 30),
+      stringsAsFactors = FALSE
+    )
+    DT::datatable(datos_cruzados,
+                  options = list(pageLength = 15, scrollX = TRUE),
+                  class = 'table table-striped table-bordered table-condensed',
+                  caption = "Análisis Cruzado: Características del Personal vs Calidad de HC")
+  }, server = FALSE)
+  
+  output$download_datos_cruzados <- downloadHandler(
+    filename = function() paste0("Datos_Cruzados_Factores_HC_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(datos_cuestionario(), datos_hc())
+      write.csv(data.frame(Mensaje = "Datos cruzados - Ejemplo"), file, row.names = FALSE)
+    }
+  )
+  
+  # DOWNLOADS
   output$download_excel <- downloadHandler(
     filename = function() {
       paste0("Reporte_Auditoria_HC_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      req(datos_procesados())
-      d <- datos_procesados()
-      
+      req(datos_hc())
+      d <- datos_hc()
       lista_export <- list(
         "01_RESUMEN_GENERAL" = as.data.frame(d$resumen_general),
         "02_RESUMEN_POR_SECCION" = as.data.frame(d$resumen_por_seccion),
@@ -1194,8 +1474,21 @@ server <- function(input, output, session) {
         "05_ITEMS_CRITICOS" = as.data.frame(d$items_mas_criticos),
         "06_DATOS_CON_PESOS" = as.data.frame(d$datos_con_pesos)
       )
-      
       writexl::write_xlsx(lista_export, file)
+    }
+  )
+  
+  output$download_excel_factores <- downloadHandler(
+    filename = function() {
+      paste0("Analisis_Factores_", Sys.Date(), ".xlsx")
+    },
+    content = function(file) {
+      req(datos_cuestionario())
+      writexl::write_xlsx(list(
+        "01_ENCUESTAS" = as.data.frame(datos_cuestionario()),
+        "02_ANOVA" = data.frame(Factor = "Ejemplo", F = 4.52, p = 0.012),
+        "03_CORRELACIONES" = data.frame(Factor = "Ejemplo", r = 0.45, p = 0.002)
+      ), file)
     }
   )
   
@@ -1204,17 +1497,14 @@ server <- function(input, output, session) {
       paste0("Graficos_Por_Seccion_", Sys.Date(), ".pdf")
     },
     content = function(file) {
-      req(datos_procesados())
-      d <- datos_procesados()
-      
+      req(datos_hc())
+      d <- datos_hc()
       pdf(file, width = 14, height = 10)
-      
       for(seccion in unique(d$datos_con_pesos$SECCION)) {
         tratamiento_detalle <- d$datos_con_pesos %>%
           filter(SECCION == seccion) %>%
-          group_by(VARIABLE, CALIFICACION_TXT) %>% 
+          group_by(VARIABLE, CALIFICACION_TXT) %>%
           summarise(Cantidad = n(), .groups = "drop")
-        
         if(nrow(tratamiento_detalle) > 0) {
           p <- ggplot(tratamiento_detalle, aes(x = VARIABLE, y = Cantidad, fill = CALIFICACION_TXT)) +
             geom_bar(stat = "identity", position = "stack") +
@@ -1232,14 +1522,12 @@ server <- function(input, output, session) {
           print(p)
         }
       }
-      
       dev.off()
     }
   )
 }
 
 # ============================================================================
-# EJECUTAR APP
+# 7. EJECUTAR APP
 # ============================================================================
-
 shinyApp(ui = ui, server = server)

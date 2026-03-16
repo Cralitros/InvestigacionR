@@ -5,7 +5,7 @@ account: dashcralitros
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 16823675
-bundleId: 11667066
+bundleId: 11690400
 url: https://dashcralitros.shinyapps.io/InvestigacionR/
 version: 1
 asMultiple: FALSE
